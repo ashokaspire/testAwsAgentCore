@@ -6,24 +6,52 @@
 <title>Asteroid Blaster</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --space: #060713;
+  --space-deep: #000010;
+  --panel: rgba(12, 18, 35, 0.94);
+  --panel-soft: rgba(18, 28, 48, 0.72);
+  --line: rgba(137, 255, 193, 0.22);
+  --text: #edf9f3;
+  --muted: #9aabac;
+  --green: #74f7a7;
+  --green-bright: #a5ffc8;
+  --yellow: #ffe483;
+  --danger: #ff7373;
+}
 body {
-  background: #0a0a1a;
-  color: #e0e0e0;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(46, 122, 106, 0.25), transparent 42rem),
+    var(--space);
+  color: var(--text);
   font-family: 'Courier New', monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  padding: 16px 12px 32px;
 }
 #game-container {
   position: relative;
-  margin-top: 10px;
+  width: min(800px, 100%);
+  margin-top: 4px;
+}
+#game-container.hidden {
+  display: none;
 }
 canvas {
   display: block;
-  border: 1px solid #333;
-  background: #000010;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--space-deep);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+canvas:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
 }
 #hud {
   position: absolute;
@@ -50,7 +78,7 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.75);
+  background: rgba(0,0,8,0.82);
   z-index: 10;
 }
 #overlay.hidden { display: none; }
@@ -85,7 +113,6 @@ canvas {
   font-size: 16px;
   padding: 6px 12px;
   text-align: center;
-  outline: none;
   width: 200px;
 }
 #name-form button {
@@ -97,6 +124,12 @@ canvas {
   padding: 6px 18px;
   cursor: pointer;
 }
+#name-form input:focus-visible,
+#name-form button:focus-visible,
+#start-btn:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 4px;
+}
 #name-form button:disabled {
   background: #555;
   color: #888;
@@ -107,10 +140,11 @@ canvas {
   min-height: 18px;
 }
 #scores-panel {
-  margin-top: 12px;
+  margin-top: 20px;
   width: 100%;
   max-width: 800px;
-  padding: 0 20px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
 }
 #scores-panel h2 {
   text-align: center;
@@ -124,6 +158,13 @@ canvas {
   text-align: center;
   font-size: 14px;
 }
+#scores-list .scores-message {
+  color: var(--muted);
+  line-height: 1.5;
+}
+#scores-list .scores-error {
+  color: var(--danger);
+}
 #scores-list table {
   margin: 0 auto;
   border-collapse: collapse;
@@ -135,55 +176,217 @@ canvas {
 #scores-list th { color: #0f0; border-bottom: 1px solid #333; }
 #scores-list td { color: #bbb; }
 #title-screen {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.85);
-  z-index: 20;
+  width: min(800px, 100%);
+  min-height: min(600px, calc(100vh - 32px));
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(28px, 7vw, 64px);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background:
+    linear-gradient(rgba(116, 247, 167, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(116, 247, 167, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 78% 18%, rgba(116, 247, 167, 0.13), transparent 18rem),
+    var(--panel);
+  background-size: 36px 36px, 36px 36px, auto, auto;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
 }
 #title-screen.hidden { display: none; }
+#title-screen::after {
+  content: "";
+  position: absolute;
+  right: -78px;
+  top: -92px;
+  width: 260px;
+  height: 260px;
+  border: 1px solid rgba(116, 247, 167, 0.18);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 32px rgba(116, 247, 167, 0.025),
+    0 0 0 64px rgba(116, 247, 167, 0.018);
+  pointer-events: none;
+}
+.title-copy,
+.briefing-grid,
+.launch-row {
+  position: relative;
+  z-index: 1;
+}
+.eyebrow {
+  margin-bottom: 12px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
 #title-screen h1 {
-  font-size: 42px;
-  color: #0f0;
-  text-shadow: 0 0 15px #0f0;
-  margin-bottom: 20px;
+  max-width: 11ch;
+  color: var(--text);
+  font-size: clamp(40px, 9vw, 72px);
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+  text-shadow: 0 0 30px rgba(116, 247, 167, 0.25);
+}
+#title-screen .description {
+  max-width: 58ch;
+  margin-top: 22px;
+  color: #c8d6d2;
+  font-family: system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+.briefing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 36px 0;
+}
+.briefing-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+.briefing-card h2 {
+  margin-bottom: 14px;
+  color: var(--green-bright);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 #title-screen .controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 14px;
+  color: #d4dfdc;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.controls dt {
+  color: var(--yellow);
+  font-weight: bold;
+}
+.controls dd {
+  color: var(--muted);
+}
+.scoring-copy {
+  color: #c8d6d2;
+  font-family: system-ui, sans-serif;
   font-size: 14px;
-  color: #aaa;
-  line-height: 1.8;
-  text-align: center;
+  line-height: 1.55;
+}
+.scoring-copy strong {
+  color: var(--yellow);
+}
+.launch-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+#start-btn {
+  min-width: 190px;
+  padding: 14px 22px;
+  border: 1px solid var(--green);
+  border-radius: 2px;
+  background: var(--green);
+  color: #04120a;
+  font: bold 15px 'Courier New', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 28px rgba(116, 247, 167, 0.15);
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+#start-btn:hover {
+  background: var(--green-bright);
+  box-shadow: 0 0 34px rgba(116, 247, 167, 0.3);
+}
+#start-btn:active {
+  transform: translateY(1px);
 }
 #title-screen .start-hint {
-  font-size: 18px;
-  color: #ff0;
-  margin-top: 24px;
-  animation: blink 1.2s infinite;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+@media (max-width: 620px) {
+  body { padding: 8px 8px 24px; }
+  #title-screen {
+    min-height: calc(100vh - 16px);
+    padding: 28px 22px;
+  }
+  .briefing-grid {
+    grid-template-columns: 1fr;
+    margin: 28px 0;
+  }
+  .launch-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #start-btn { width: 100%; }
+  #hud, #lives-display { font-size: 13px; }
+  #overlay h1 { font-size: 28px; }
+  #scores-list th, #scores-list td { padding: 4px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>
 </head>
 <body>
-<div id="game-container">
-  <canvas id="canvas" width="800" height="600"></canvas>
+<section id="title-screen" aria-labelledby="game-title">
+  <div class="title-copy">
+    <p class="eyebrow">Flight briefing // Sector 07</p>
+    <h1 id="game-title">ASTEROID BLASTER</h1>
+    <p class="description">
+      Pilot a lone interceptor through an unending asteroid field. Break apart
+      incoming rocks, clear each wave, and survive long enough to claim a place
+      on the high-score board.
+    </p>
+  </div>
+  <div class="briefing-grid">
+    <section class="briefing-card" aria-labelledby="controls-heading">
+      <h2 id="controls-heading">Flight controls</h2>
+      <dl class="controls">
+        <dt>← / →</dt><dd>Rotate ship</dd>
+        <dt>↑</dt><dd>Thrust forward</dd>
+        <dt>Space</dt><dd>Fire cannon</dd>
+        <dt>R</dt><dd>Restart after game over</dd>
+      </dl>
+    </section>
+    <section class="briefing-card" aria-labelledby="mission-heading">
+      <h2 id="mission-heading">Mission &amp; scoring</h2>
+      <p class="scoring-copy">
+        Shoot asteroids before they collide with your ship. Large rocks split
+        into smaller, faster targets. <strong>Every asteroid destroyed earns 1 point.</strong>
+        Clear the field to begin a larger wave.
+      </p>
+    </section>
+  </div>
+  <div class="launch-row">
+    <button id="start-btn" type="button">Launch mission</button>
+    <p class="start-hint">Keyboard ready?<br>Press Space to launch.</p>
+  </div>
+</section>
+<div id="game-container" class="hidden">
+  <canvas
+    id="canvas"
+    width="800"
+    height="600"
+    tabindex="0"
+    aria-label="Asteroid Blaster game area. Use the arrow keys to fly and Space to fire."
+  >Your browser does not support the Asteroid Blaster game canvas.</canvas>
   <div id="hud">SCORE: <span id="score-display">0</span></div>
   <div id="lives-display"></div>
-  <div id="title-screen">
-    <h1>ASTEROID BLASTER</h1>
-    <div class="controls">
-      LEFT / RIGHT &mdash; Rotate<br>
-      UP &mdash; Thrust<br>
-      SPACE &mdash; Fire<br>
-      R &mdash; Restart
-    </div>
-    <div class="start-hint">Press SPACE to start</div>
-  </div>
   <div id="overlay" class="hidden">
     <h1>GAME OVER</h1>
     <div class="final-score">Score: <span id="final-score">0</span></div>
@@ -197,7 +400,9 @@ canvas {
 </div>
 <div id="scores-panel">
   <h2>HIGH SCORES</h2>
-  <div id="scores-list"></div>
+  <div id="scores-list" aria-live="polite">
+    <p class="scores-message">Loading scores...</p>
+  </div>
 </div>
 <script>
 (function() {
@@ -311,9 +516,11 @@ canvas {
     document.getElementById("score-display").textContent = "0";
     document.getElementById("overlay").classList.add("hidden");
     document.getElementById("title-screen").classList.add("hidden");
+    document.getElementById("game-container").classList.remove("hidden");
     document.getElementById("save-status").textContent = "";
     document.getElementById("save-btn").disabled = false;
     gameState = "playing";
+    canvas.focus({ preventScroll: true });
   }
 
   function gameOver() {
@@ -332,9 +539,11 @@ canvas {
   }
 
   // Input
+  document.getElementById("start-btn").addEventListener("click", startGame);
+
   document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA") {
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON") {
       if (e.key === "Escape") e.target.blur();
       return;
     }
@@ -609,10 +818,18 @@ canvas {
 
   function loadScores() {
     fetch("scores")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) {
+          return r.json()
+            .catch(() => ({}))
+            .then(d => { throw new Error(d.error || `Request failed (${r.status})`); });
+        }
+        return r.json();
+      })
       .then(rows => {
         if (!rows.length) {
-          document.getElementById("scores-list").innerHTML = "<p style='color:#666'>No scores yet</p>";
+          document.getElementById("scores-list").innerHTML =
+            '<p class="scores-message">No scores yet. Complete a mission to be first.</p>';
           return;
         }
         let html = "<table><tr><th>#</th><th>Name</th><th>Score</th></tr>";
@@ -622,7 +839,10 @@ canvas {
         html += "</table>";
         document.getElementById("scores-list").innerHTML = html;
       })
-      .catch(() => {});
+      .catch(err => {
+        document.getElementById("scores-list").innerHTML =
+          `<p class="scores-message scores-error">Could not load scores: ${escHtml(err.message)}</p>`;
+      });
   }
 
   function escHtml(s) {
