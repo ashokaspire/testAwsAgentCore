@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asteroid Blaster</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a1a;
+  color: #e0e0e0;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+#game-container {
+  position: relative;
+  margin-top: 10px;
+}
+canvas {
+  display: block;
+  border: 1px solid #333;
+  background: #000010;
+}
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 18px;
+  color: #0f0;
+  pointer-events: none;
+  text-shadow: 0 0 6px #0f0;
+}
+#lives-display {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 18px;
+  color: #0f0;
+  pointer-events: none;
+  text-shadow: 0 0 6px #0f0;
+}
+#overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.75);
+  z-index: 10;
+}
+#overlay.hidden { display: none; }
+#overlay h1 {
+  font-size: 36px;
+  color: #ff4444;
+  text-shadow: 0 0 10px #ff0000;
+  margin-bottom: 10px;
+}
+#overlay .final-score {
+  font-size: 24px;
+  color: #0f0;
+  margin-bottom: 20px;
+}
+#overlay .restart-hint {
+  font-size: 16px;
+  color: #aaa;
+  margin-bottom: 20px;
+}
+#name-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#name-form input {
+  background: #111;
+  border: 1px solid #0f0;
+  color: #0f0;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  padding: 6px 12px;
+  text-align: center;
+  outline: none;
+  width: 200px;
+}
+#name-form button {
+  background: #0f0;
+  color: #000;
+  border: none;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  padding: 6px 18px;
+  cursor: pointer;
+}
+#name-form button:disabled {
+  background: #555;
+  color: #888;
+  cursor: default;
+}
+#save-status {
+  font-size: 14px;
+  min-height: 18px;
+}
+#scores-panel {
+  margin-top: 12px;
+  width: 100%;
+  max-width: 800px;
+  padding: 0 20px;
+}
+#scores-panel h2 {
+  text-align: center;
+  color: #0f0;
+  font-size: 20px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 6px #0f0;
+}
+#scores-list {
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+}
+#scores-list table {
+  margin: 0 auto;
+  border-collapse: collapse;
+}
+#scores-list th, #scores-list td {
+  padding: 3px 16px;
+  text-align: left;
+}
+#scores-list th { color: #0f0; border-bottom: 1px solid #333; }
+#scores-list td { color: #bbb; }
+#title-screen {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.85);
+  z-index: 20;
+}
+#title-screen.hidden { display: none; }
+#title-screen h1 {
+  font-size: 42px;
+  color: #0f0;
+  text-shadow: 0 0 15px #0f0;
+  margin-bottom: 20px;
+}
+#title-screen .controls {
+  font-size: 14px;
+  color: #aaa;
+  line-height: 1.8;
+  text-align: center;
+}
+#title-screen .start-hint {
+  font-size: 18px;
+  color: #ff0;
+  margin-top: 24px;
+  animation: blink 1.2s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+</style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="canvas" width="800" height="600"></canvas>
+  <div id="hud">SCORE: <span id="score-display">0</span></div>
+  <div id="lives-display"></div>
+  <div id="title-screen">
+    <h1>ASTEROID BLASTER</h1>
+    <div class="controls">
+      LEFT / RIGHT &mdash; Rotate<br>
+      UP &mdash; Thrust<br>
+      SPACE &mdash; Fire<br>
+      R &mdash; Restart
+    </div>
+    <div class="start-hint">Press SPACE to start</div>
+  </div>
+  <div id="overlay" class="hidden">
+    <h1>GAME OVER</h1>
+    <div class="final-score">Score: <span id="final-score">0</span></div>
+    <div id="name-form">
+      <input type="text" id="name-input" maxlength="20" placeholder="Your name" autocomplete="off">
+      <button id="save-btn">Save Score</button>
+      <div id="save-status"></div>
+    </div>
+    <div class="restart-hint">Press R to restart</div>
+  </div>
+</div>
+<div id="scores-panel">
+  <h2>HIGH SCORES</h2>
+  <div id="scores-list"></div>
+</div>
+<script>
+(function() {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  const keys = {};
+  let gameState = "title"; // title, playing, gameover
+  let score = 0;
+  let ship = null;
+  let bullets = [];
+  let asteroids = [];
+  let particles = [];
+  let stars = [];
+  let savePending = false;
+  let scoreSaved = false;
+
+  // Stars background
+  function createStars() {
+    stars = [];
+    for (let i = 0; i < 120; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size: Math.random() * 1.5 + 0.5,
+        brightness: Math.random() * 0.5 + 0.5
+      });
+    }
+  }
+
+  function createShip() {
+    return {
+      x: W / 2, y: H / 2,
+      vx: 0, vy: 0,
+      angle: -Math.PI / 2,
+      radius: 12,
+      thrusting: false,
+      invulnerable: 0
+    };
+  }
+
+  function spawnAsteroids(count) {
+    const arr = [];
+    for (let i = 0; i < count; i++) {
+      let x, y;
+      do {
+        x = Math.random() * W;
+        y = Math.random() * H;
+      } while (dist(x, y, W/2, H/2) < 150);
+      arr.push(makeAsteroid(x, y, 3));
+    }
+    return arr;
+  }
+
+  function makeAsteroid(x, y, size) {
+    const speed = (4 - size) * 0.8 + 0.5;
+    const angle = Math.random() * Math.PI * 2;
+    const radii = [];
+    const verts = size === 3 ? 10 : size === 2 ? 8 : 6;
+    const baseR = size === 3 ? 40 : size === 2 ? 22 : 12;
+    for (let i = 0; i < verts; i++) {
+      radii.push(baseR * (0.7 + Math.random() * 0.3));
+    }
+    return {
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size,
+      radius: baseR,
+      radii,
+      verts,
+      rotAngle: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.03
+    };
+  }
+
+  function dist(x1, y1, x2, y2) {
+    return Math.hypot(x2 - x1, y2 - y1);
+  }
+
+  function wrap(obj) {
+    if (obj.x < -50) obj.x += W + 100;
+    if (obj.x > W + 50) obj.x -= W + 100;
+    if (obj.y < -50) obj.y += H + 100;
+    if (obj.y > H + 50) obj.y -= H + 100;
+  }
+
+  function spawnParticles(x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3 + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 30 + Math.random() * 20,
+        color
+      });
+    }
+  }
+
+  function startGame() {
+    score = 0;
+    scoreSaved = false;
+    savePending = false;
+    ship = createShip();
+    bullets = [];
+    asteroids = spawnAsteroids(5);
+    particles = [];
+    document.getElementById("score-display").textContent = "0";
+    document.getElementById("overlay").classList.add("hidden");
+    document.getElementById("title-screen").classList.add("hidden");
+    document.getElementById("save-status").textContent = "";
+    document.getElementById("save-btn").disabled = false;
+    gameState = "playing";
+  }
+
+  function gameOver() {
+    gameState = "gameover";
+    document.getElementById("final-score").textContent = score;
+    document.getElementById("overlay").classList.remove("hidden");
+    document.getElementById("name-input").value = "";
+    document.getElementById("save-status").textContent = "";
+    document.getElementById("save-btn").disabled = false;
+    scoreSaved = false;
+    savePending = false;
+    loadScores();
+    setTimeout(() => {
+      document.getElementById("name-input").focus();
+    }, 100);
+  }
+
+  // Input
+  document.addEventListener("keydown", (e) => {
+    const tag = e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      if (e.key === "Escape") e.target.blur();
+      return;
+    }
+    keys[e.key] = true;
+    if (e.key === " " || e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+    }
+    if (e.key === " " && gameState === "title") {
+      startGame();
+    }
+    if ((e.key === "r" || e.key === "R") && gameState === "gameover") {
+      startGame();
+    }
+  });
+  document.addEventListener("keyup", (e) => {
+    keys[e.key] = false;
+  });
+
+  // Shooting cooldown
+  let shootCooldown = 0;
+
+  function update() {
+    if (gameState !== "playing") return;
+
+    // Ship rotation
+    if (keys["ArrowLeft"]) ship.angle -= 0.06;
+    if (keys["ArrowRight"]) ship.angle += 0.06;
+
+    // Thrust
+    ship.thrusting = !!keys["ArrowUp"];
+    if (ship.thrusting) {
+      ship.vx += Math.cos(ship.angle) * 0.12;
+      ship.vy += Math.sin(ship.angle) * 0.12;
+    }
+
+    // Friction
+    ship.vx *= 0.99;
+    ship.vy *= 0.99;
+
+    // Speed cap
+    const spd = Math.hypot(ship.vx, ship.vy);
+    if (spd > 6) {
+      ship.vx = (ship.vx / spd) * 6;
+      ship.vy = (ship.vy / spd) * 6;
+    }
+
+    ship.x += ship.vx;
+    ship.y += ship.vy;
+    wrap(ship);
+
+    if (ship.invulnerable > 0) ship.invulnerable--;
+
+    // Shooting
+    if (shootCooldown > 0) shootCooldown--;
+    if (keys[" "] && shootCooldown === 0 && bullets.length < 8) {
+      bullets.push({
+        x: ship.x + Math.cos(ship.angle) * 14,
+        y: ship.y + Math.sin(ship.angle) * 14,
+        vx: Math.cos(ship.angle) * 8 + ship.vx * 0.3,
+        vy: Math.sin(ship.angle) * 8 + ship.vy * 0.3,
+        life: 50
+      });
+      shootCooldown = 8;
+    }
+
+    // Bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life--;
+      wrap(b);
+      if (b.life <= 0) bullets.splice(i, 1);
+    }
+
+    // Asteroids
+    for (const a of asteroids) {
+      a.x += a.vx;
+      a.y += a.vy;
+      a.rotAngle += a.rotSpeed;
+      wrap(a);
+    }
+
+    // Bullet-asteroid collisions
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      for (let j = asteroids.length - 1; j >= 0; j--) {
+        if (dist(bullets[i].x, bullets[i].y, asteroids[j].x, asteroids[j].y) < asteroids[j].radius) {
+          const a = asteroids[j];
+          spawnParticles(a.x, a.y, a.size * 5, "#ff8800");
+
+          if (a.size > 1) {
+            const newSize = a.size - 1;
+            for (let k = 0; k < 2; k++) {
+              asteroids.push(makeAsteroid(a.x, a.y, newSize));
+            }
+          }
+
+          score++;
+          document.getElementById("score-display").textContent = score;
+
+          asteroids.splice(j, 1);
+          bullets.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Ship-asteroid collision
+    if (ship.invulnerable <= 0) {
+      for (const a of asteroids) {
+        if (dist(ship.x, ship.y, a.x, a.y) < a.radius + ship.radius - 4) {
+          spawnParticles(ship.x, ship.y, 20, "#00ff88");
+          gameOver();
+          return;
+        }
+      }
+    }
+
+    // Spawn new wave
+    if (asteroids.length === 0) {
+      const wave = Math.min(5 + Math.floor(score / 10), 12);
+      asteroids = spawnAsteroids(wave);
+      ship.invulnerable = 90;
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.97;
+      p.vy *= 0.97;
+      p.life--;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawShip() {
+    if (ship.invulnerable > 0 && Math.floor(ship.invulnerable / 4) % 2 === 0) return;
+    ctx.save();
+    ctx.translate(ship.x, ship.y);
+    ctx.rotate(ship.angle);
+    ctx.strokeStyle = "#0f0";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-10, -9);
+    ctx.lineTo(-6, 0);
+    ctx.lineTo(-10, 9);
+    ctx.closePath();
+    ctx.stroke();
+
+    if (ship.thrusting && Math.random() > 0.3) {
+      ctx.strokeStyle = "#f80";
+      ctx.beginPath();
+      ctx.moveTo(-6, -4);
+      ctx.lineTo(-14 - Math.random() * 8, 0);
+      ctx.lineTo(-6, 4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawAsteroid(a) {
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.rotAngle);
+    ctx.strokeStyle = "#aaa";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < a.verts; i++) {
+      const ang = (i / a.verts) * Math.PI * 2;
+      const r = a.radii[i];
+      if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
+      else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    ctx.fillStyle = "#000010";
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    for (const s of stars) {
+      ctx.fillStyle = `rgba(255,255,255,${s.brightness})`;
+      ctx.fillRect(s.x, s.y, s.size, s.size);
+    }
+
+    // Particles
+    for (const p of particles) {
+      const alpha = p.life / 50;
+      ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, "0");
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+    }
+
+    // Asteroids
+    for (const a of asteroids) drawAsteroid(a);
+
+    // Bullets
+    ctx.fillStyle = "#ff0";
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Ship
+    if (gameState === "playing" && ship) drawShip();
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // Score saving
+  const saveBtn = document.getElementById("save-btn");
+  const nameInput = document.getElementById("name-input");
+  const saveStatus = document.getElementById("save-status");
+
+  function handleSave(e) {
+    if (e) e.preventDefault();
+    if (savePending || scoreSaved) return;
+    const name = nameInput.value.trim();
+    if (!name) {
+      saveStatus.textContent = "Enter a name first";
+      saveStatus.style.color = "#f44";
+      return;
+    }
+    savePending = true;
+    saveBtn.disabled = true;
+    saveStatus.textContent = "Saving...";
+    saveStatus.style.color = "#ff0";
+
+    fetch("scores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, score })
+    })
+    .then(r => {
+      if (!r.ok) return r.json().then(d => { throw new Error(d.error || "Save failed"); });
+      return r.json();
+    })
+    .then(() => {
+      scoreSaved = true;
+      savePending = false;
+      saveStatus.textContent = "Score saved!";
+      saveStatus.style.color = "#0f0";
+      saveBtn.disabled = true;
+      loadScores();
+    })
+    .catch(err => {
+      savePending = false;
+      saveBtn.disabled = false;
+      saveStatus.textContent = err.message;
+      saveStatus.style.color = "#f44";
+    });
+  }
+
+  saveBtn.addEventListener("click", handleSave);
+  nameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    }
+    e.stopPropagation();
+  });
+
+  function loadScores() {
+    fetch("scores")
+      .then(r => r.json())
+      .then(rows => {
+        if (!rows.length) {
+          document.getElementById("scores-list").innerHTML = "<p style='color:#666'>No scores yet</p>";
+          return;
+        }
+        let html = "<table><tr><th>#</th><th>Name</th><th>Score</th></tr>";
+        rows.forEach((r, i) => {
+          html += `<tr><td>${i+1}</td><td>${escHtml(r.name)}</td><td>${r.score}</td></tr>`;
+        });
+        html += "</table>";
+        document.getElementById("scores-list").innerHTML = html;
+      })
+      .catch(() => {});
+  }
+
+  function escHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  createStars();
+  loadScores();
+  loop();
+})();
+</script>
+</body>
+</html>
